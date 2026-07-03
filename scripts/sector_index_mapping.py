@@ -68,3 +68,38 @@ TRACK_B_BASKETS = {
 _covered = set(TRACK_A_KEYWORDS) | set(TRACK_B_BASKETS)
 _all_ids = {s["id"] for s in SECTORS}
 assert _covered == _all_ids, f"매핑 누락: {_all_ids - _covered}"
+
+# Track D (보조, 2026-07-03 웹서치로 확인): KRX 지수 대신 섹터 ETF 가격을 프록시로 쓰는
+# 방법. data.krx.co.kr 직접 접근이 막혔을 때의 대안으로 검토됨(사용자 요청).
+# 이 세션에서는 WebSearch로 티커 존재까지는 확인했지만, 실제 가격 데이터가 있는 페이지
+# (Naver/Yahoo Finance, 삼성자산운용, Investing.com, WiseReport, Stooq)는 전부 WebFetch가
+# 403/차단되어 가격 시계열은 가져오지 못했다. 아래 티커는 검색 스니펫에 코드가 명시적으로
+# 노출된 것만 담았고("종목코드: ..." 형태로 직접 확인), ISIN(KR7xxxxxxxxx)에서 역산한 것은
+# 별도 표기했다. Agent Store capital-markets(finance_securities_quote)가 복구되거나
+# pykrx로 KRX 접근이 가능한 환경에서 이 티커로 바로 조회해 가격 시계열을 채울 것.
+TRACK_D_ETF_PROXY = {
+    "semis": {
+        "tickers": ["091160", "091230", "396500"],
+        "names": ["KODEX 반도체", "TIGER 반도체", "TIGER Fn반도체TOP10"],
+        "confidence": "confirmed",  # 검색 결과에 종목코드 명시
+    },
+    "battery": {
+        "tickers": ["305720"],
+        "names": ["KODEX 2차전지산업"],
+        "confidence": "confirmed",
+    },
+    "defense": {
+        "tickers": ["490480"],
+        "names": ["SOL K방산"],
+        "confidence": "confirmed",
+    },
+    "banks": {
+        "tickers": ["091220", "466940"],
+        "names": ["TIGER 은행", "TIGER 은행고배당TOP10"],
+        "confidence": "isin_derived",  # ISIN(KR7091220004 등)에서 역산, 티커 직접 확인 필요
+    },
+    # 나머지 15개 세부업종은 이번 웹서치에서 신뢰할 만한 티커를 확보하지 못함.
+    # (화장품/조선/자동차부품/철강/화학소재/증권/제약/바이오텍/인터넷/게임/통신서비스/
+    #  전력유틸리티/건설/기계/반도체장비-소재/전력기기 — 상품이 존재할 가능성은 높으나
+    #  이 세션에서 코드 확인 실패)
+}
