@@ -34,7 +34,31 @@ python scripts/fetch_sector_data.py --start 2024-01-01 --end 2026-06-30 \
     --out data/sector_monthly_returns.json
 ```
 
-**B. 토스증권 앱/API에서 사람이 직접 값을 가져와 입력 (이 세션이 KRX/증권사 API에 접근 불가한 경우)**
+**B. 토스증권 Open API로 자동 수집 (권장 — IP 화이트리스트가 걸린 로컬 환경에서 실행)**
+
+토스증권 Open API의 공식 스펙(`/api/v1/candles`, Market Data 그룹)을 확인해 스크립트로 만들어 뒀다.
+이 엔드포인트는 계좌 연동이 필요 없는 읽기 전용 API지만, 발급받은 클라이언트(API Key/Secret Key)에
+IP 화이트리스트가 걸려 있으므로 **그 IP가 등록된 로컬 환경에서 실행해야 한다** (이 리포지토리를
+다루는 샌드박스에서는 실행 불가).
+
+```bash
+pip install requests
+export TOSS_CLIENT_ID=발급받은_API_Key       # 절대 코드/커밋에 넣지 말 것
+export TOSS_CLIENT_SECRET=발급받은_Secret_Key
+python scripts/fetch_toss_data.py --since 2023-12-01 --out data/sector_monthly_returns.json
+```
+
+- `/api/v1/candles`는 월봉을 지원하지 않아(`interval`이 `1m`/`1d`만 가능) 일봉을 받아 각 월의
+  마지막 거래일 종가를 직접 뽑아 월간 수익률을 계산한다. 한 번에 최대 200개 봉만 오므로
+  종목당 여러 번 페이지네이션(`before` 파라미터)한다.
+- `scripts/sector_index_mapping.py`의 `SECTOR_TOSS_SYMBOL`에 4개 세부업종(반도체·2차전지·
+  방위산업·은행)만 티커가 채워져 있다. 나머지 15개는 `None`이라 건너뛰고 `null`로 남는다 —
+  같은 파일의 `TOSS_SEARCH_HINTS` 키워드로 토스 앱에서 검색해 티커를 채워 넣으면 그 섹터도
+  수집된다.
+- **경고**: 이 API의 `/api/v1/orders` 등 Order 그룹은 실제 매매를 실행하는 엔드포인트다.
+  `fetch_toss_data.py`는 Market Data(조회)만 호출하며 주문 관련 코드는 전혀 포함하지 않는다.
+
+**C. 토스증권 앱/API에서 사람이 직접 값을 가져와 입력 (자동화 없이 수동으로)**
 
 1. `scripts/toss_data_template.csv`를 연다. 19개 세부업종 행이 있고, `ticker`/`instrument_name`
    컬럼에 이미 확인된 4개 섹터(반도체·2차전지·방위산업·은행)의 대표 ETF가 채워져 있다.

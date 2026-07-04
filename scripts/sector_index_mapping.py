@@ -104,6 +104,15 @@ TRACK_D_ETF_PROXY = {
     #  이 세션에서 코드 확인 실패)
 }
 
+# scripts/fetch_toss_data.py가 사용하는 최종 심볼 맵.
+# 토스증권 Open API /api/v1/candles의 symbol 파라미터에 그대로 들어간다 (KR: 6자리 종목코드).
+# TRACK_D_ETF_PROXY에서 confirmed인 4개는 채워져 있음. 나머지 15개는 None이며,
+# TOSS_SEARCH_HINTS 키워드로 토스 앱에서 검색해 확인한 티커를 직접 채워 넣을 것.
+SECTOR_TOSS_SYMBOL = {
+    s["id"]: (TRACK_D_ETF_PROXY[s["id"]]["tickers"][0] if s["id"] in TRACK_D_ETF_PROXY else None)
+    for s in SECTORS
+}
+
 # Track A/D 티커가 없는 나머지 세부업종용 — 토스증권 앱에서 검색해볼 키워드 제안.
 # 정확한 상품/티커를 보장하지 않음 (이 세션에서 검증 못함). 유사 상품이 여러 개면
 # 순자산(AUM)이 가장 큰 것을 대표로 고르는 것을 권장.
