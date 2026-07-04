@@ -103,3 +103,24 @@ TRACK_D_ETF_PROXY = {
     #  전력유틸리티/건설/기계/반도체장비-소재/전력기기 — 상품이 존재할 가능성은 높으나
     #  이 세션에서 코드 확인 실패)
 }
+
+# Track A/D 티커가 없는 나머지 세부업종용 — 토스증권 앱에서 검색해볼 키워드 제안.
+# 정확한 상품/티커를 보장하지 않음 (이 세션에서 검증 못함). 유사 상품이 여러 개면
+# 순자산(AUM)이 가장 큰 것을 대표로 고르는 것을 권장.
+TOSS_SEARCH_HINTS = {
+    "semi_equip": "반도체장비 OR 반도체소재",
+    "power_equip": "전력기기 OR 전력설비",
+    "cosmetics": "화장품",
+    "shipbuilding": "조선",
+    "auto_parts": "자동차 (부품사 포함 여부 확인)",
+    "steel": "철강",
+    "chemicals": "화학 OR 에너지화학",
+    "securities": "증권",
+    "pharma": "제약",
+    "biotech": "바이오 OR 헬스케어",
+    "internet": "인터넷 OR 미디어콘텐츠",
+    "gaming": "게임",
+    "telecom": "통신서비스 OR 미디어통신",
+    "power_utility": "전력 OR 유틸리티",
+    "construction_machinery": "건설 OR 기계장비",
+}

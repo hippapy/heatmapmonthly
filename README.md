@@ -24,9 +24,9 @@
 (`meta.is_sample: true`). 섹터 로테이션 내러티브(반도체 강세 → 방산 강세 → 2차전지 강세 구간)를
 일부러 흉내 내어 히트맵 기능이 어떻게 보이는지 확인할 수 있게 했을 뿐, 실제 시장 수익률이 아니다.
 
-### 실데이터로 교체하는 방법
+### 실데이터로 교체하는 방법 (택1)
 
-KRX 접근이 가능한 환경(로컬 PC, 사내 서버 등)에서:
+**A. KRX 접근이 가능한 환경(로컬 PC, 사내 서버 등)에서 pykrx 자동 수집**
 
 ```bash
 pip install pykrx pandas
@@ -34,8 +34,26 @@ python scripts/fetch_sector_data.py --start 2024-01-01 --end 2026-06-30 \
     --out data/sector_monthly_returns.json
 ```
 
-실행되면 `meta.is_sample`이 자동으로 `false`가 되고, 대시보드를 새로고침하면 샘플 배너가 사라지며
-실데이터로 렌더링된다. HTML은 수정할 필요 없다.
+**B. 토스증권 앱/API에서 사람이 직접 값을 가져와 입력 (이 세션이 KRX/증권사 API에 접근 불가한 경우)**
+
+1. `scripts/toss_data_template.csv`를 연다. 19개 세부업종 행이 있고, `ticker`/`instrument_name`
+   컬럼에 이미 확인된 4개 섹터(반도체·2차전지·방위산업·은행)의 대표 ETF가 채워져 있다.
+   나머지 15개는 `scripts/sector_index_mapping.py`의 `TOSS_SEARCH_HINTS`에 있는 키워드로
+   토스증권 앱에서 검색해 가장 순자산(AUM)이 큰 섹터 ETF를 골라 `ticker`/`instrument_name`을 채운다.
+   (적당한 ETF가 없는 섹터는 비워두면 해당 섹터만 `null`로 남고 나머지는 정상 렌더링된다.)
+2. 각 행의 `data_type`을 고른다:
+   - `return`: 토스에서 월간 수익률(%)을 바로 확인할 수 있으면 2024-01~2026-06 30칸에 그 값을 입력.
+   - `price`: 월말 종가/기준가만 확인 가능하면 `baseline_2023-12_price`(2023-12월말 값)와
+     2024-01~2026-06 각 월말 값을 채운다. 등락률은 스크립트가 자동 계산한다.
+3. 저장 후 실행:
+   ```bash
+   python scripts/import_toss_data.py --in scripts/toss_data_template.csv \
+       --out data/sector_monthly_returns.json
+   ```
+
+두 방법 모두 실행되면 `meta.is_sample`이 `false`가 되고(B는 비어있는 섹터가 있으면 `true`로 남아
+일부 데이터만 채워졌음을 표시), 대시보드를 새로고침하면 샘플 배너가 사라지며 실데이터로
+렌더링된다. HTML은 수정할 필요 없다.
 
 ## 데이터 수집 전략 (Track A / Track B)
 
