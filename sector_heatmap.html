@@ -307,11 +307,19 @@ let sortMode = 'avg'; // 'avg' | a month string like '2026-06'
 
 async function loadData() {
   try {
-    const res = await fetch('data/sector_monthly_returns.json', { cache: 'no-store' });
+    const controller = new AbortController();
+    // 일부 실행 환경(파일 미리보기, 샌드박스 등)에서는 fetch가 실패도 성공도 하지 않고
+    // 무한정 멈출 수 있어 하드 타임아웃으로 강제 진행시킨다.
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch('data/sector_monthly_returns.json', {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
     if (!res.ok) throw new Error('fetch failed');
     DATA = await res.json();
   } catch (e) {
-    // file:// 로 열었을 때 로컬 fetch가 CORS로 막히는 브라우저 대응 — 인라인 데이터로 폴백
+    // file:// 로 열었을 때 로컬 fetch가 CORS로 막히거나 타임아웃되는 경우 — 인라인 데이터로 폴백
     DATA = FALLBACK_DATA;
   }
   init();
@@ -519,6 +527,14 @@ function init() {
 }
 
 loadData();
+
+// 최후의 안전장치: 무슨 이유로든 4초 안에 렌더링이 시작되지 않으면 강제로 폴백 데이터를 그린다.
+setTimeout(() => {
+  if (!DATA) {
+    DATA = FALLBACK_DATA;
+    init();
+  }
+}, 4000);
 </script>
 </body>
 </html>
