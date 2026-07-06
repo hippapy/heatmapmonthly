@@ -284,7 +284,7 @@
     <div class="table-outer">
       <div class="legend-strip" style="padding: 12px 14px 0;">
         <div class="item">행 = 그 달의 수익률 순위 (맨 위 = 1위)</div>
-        <div class="item"><span class="legend-swatch" style="background:hsl(210 65% 55% / 1)"></span> 셀 = 섹터 고유색 (진할수록 |수익률| 큼)</div>
+        <div class="item"><span class="legend-swatch" style="background:hsl(210 62% 66%)"></span> 셀 색 = 세부업종 고유색 (모든 셀 동일 강도)</div>
         <div class="item"><span class="legend-swatch neg-pattern"></span> 마이너스(사선 패턴)</div>
         <div class="item"><span class="move up" style="position:static">▲</span>/<span class="move down" style="position:static">▼</span> 셀 우상단 = 전월 대비 순위 이동</div>
       </div>
@@ -303,8 +303,8 @@
 
   <footer class="page-footer">
     날짜(열)는 고정하고, 각 월 컬럼 안에서 그 달 수익률 내림차순으로 세부업종을 재배치한 순위표입니다.
-    행은 순위(맨 위 1위), 셀 색은 세부업종 고유색이라 매달 색이 위아래로 움직이는 흐름으로 섹터 로테이션을 읽을 수 있습니다.
-    색이 진할수록 |수익률|이 크고, 마이너스는 사선 패턴으로 구분합니다. 필터에서 해제한 업종은 회색조로 다운플레이됩니다.
+    행은 순위(맨 위 1위), 셀 색은 세부업종 고유색을 모든 셀에 동일 강도로 칠하므로 매달 같은 색이 어느 순위에 있는지로 섹터 로테이션을 읽을 수 있습니다.
+    마이너스는 사선 패턴으로 구분하고, 수익률(%)은 셀 안에 그대로 표기됩니다. 필터에서 해제한 업종은 회색조로 다운플레이됩니다.
   </footer>
 </div>
 
@@ -334,20 +334,12 @@ async function loadData() {
   init();
 }
 
-function globalMaxAbs() {
-  // 색상 강도 기준값. 단일 이상치가 전체 대비를 무너뜨리지 않도록 95%분위수로 캡한다
-  // (이 값을 넘는 셀은 opacity 1로 clamp됨). 데이터가 적으면 단순 최대값 사용.
-  const abs = [];
-  for (const sid in DATA.returns) {
-    for (const m of DATA.months) {
-      const v = DATA.returns[sid][m];
-      if (v !== null && v !== undefined) abs.push(Math.abs(v));
-    }
-  }
-  if (!abs.length) return 1;
-  abs.sort((a, b) => a - b);
-  const p95 = abs[Math.floor(abs.length * 0.95)] ?? abs[abs.length - 1];
-  return p95 || abs[abs.length - 1] || 1;
+// 셀 배경: 섹터 고유색을 모든 셀에 동일 강도로. 어두운 글자 가독성을 위해 명도만 살짝 올림.
+// (수익률 크기를 색 진하기로 인코딩하지 않음 — 섹터 위치 추적이 목적)
+function cellBg(color) {
+  const m = color.match(/hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/);
+  if (!m) return color;
+  return `hsl(${m[1]} 62% 66%)`;
 }
 
 // 좁은 셀에 들어갈 짧은 표기 (데이터는 건드리지 않고 표시용으로만)
@@ -442,7 +434,6 @@ function renderSummary() {
 
 function render() {
   const months = DATA.months;
-  const maxAbs = globalMaxAbs();
   const bySid = Object.fromEntries(DATA.sectors.map(s => [s.id, s]));
   const { rankedByMonth, rankLookup, depth } = computeRankTable();
 
@@ -460,8 +451,7 @@ function render() {
       if (sid === undefined) return `<td class="cell na"></td>`;
       const s = bySid[sid];
       const v = DATA.returns[sid][m];
-      const alpha = Math.min(1, Math.abs(v) / maxAbs);
-      const bg = s.color.replace(')', ` / ${alpha.toFixed(3)})`);
+      const bg = cellBg(s.color);   // 모든 셀 동일 강도 (섹터 고유색만으로 위치 추적)
       const dimmed = selected.size > 0 && !selected.has(sid);
       const negClass = v < 0 ? 'negative' : '';
 

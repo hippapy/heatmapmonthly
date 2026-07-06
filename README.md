@@ -116,6 +116,31 @@ KRX 직접 접근(pykrx)과 Agent Store `capital-markets` 서브서비스가 모
 완료하지 못했다.** `TRACK_D_ETF_PROXY`에 확인된 티커는 4개 세부업종(반도체·2차전지·방위산업·은행)
 뿐이며, 나머지 15개는 상품이 존재할 가능성은 높지만 이번 세션에서 코드를 확인하지 못했다.
 
+## 원클릭 자동화 (CMD 없이 더블클릭 → 수집 → 자동 게시)
+
+매번 명령어를 치지 않도록 `run_and_publish.bat` 하나로 **데이터 수집 → git 커밋/푸시 →
+GitHub Pages 공개 대시보드 자동 갱신**까지 끝나게 구성했다.
+
+### 최초 1회 설정
+1. **저장소 clone** (자동 push를 위해 반드시 git 저장소 안에서 실행해야 함)
+   ```bash
+   git clone https://github.com/hippapy/heatmapmonthly.git
+   cd heatmapmonthly
+   ```
+2. **GitHub Pages 켜기**: GitHub 저장소 → Settings → Pages → Build and deployment →
+   Source를 **GitHub Actions**로 선택. (`.github/workflows/pages.yml`이 자동 배포함)
+3. **git 로그인**: 처음 `git push` 시 브라우저로 GitHub 로그인 1회 (이후 캐시됨).
+
+### 매번 (더블클릭 한 번)
+- `run_and_publish.bat` 더블클릭
+  - 처음 실행 시 토스 API Key/Secret을 한 번 물어보고 `toss_secret.txt`에 저장
+    (이 파일은 `.gitignore`로 커밋 제외 — 절대 저장소에 올라가지 않음)
+  - 데이터 수집 → `data/sector_monthly_returns.json` 갱신 → 변경분만 자동 커밋/푸시
+  - 1~2분 뒤 **https://hippapy.github.io/heatmapmonthly/** 가 자동 갱신됨 (로그인 불필요, 공개)
+
+> IP 화이트리스트가 걸린 PC에서 실행해야 하며, 자동 실행(매월 말)을 원하면 이 배치파일을
+> Windows 작업 스케줄러에 등록하면 된다 (PC가 켜져 있어야 함).
+
 ## 데이터 스키마
 
 ```json
