@@ -127,27 +127,38 @@ def main():
     missing_symbol = []
     for s in SECTORS:
         sid = s["id"]
-        symbol = SECTOR_TOSS_SYMBOL.get(sid)
-        if not symbol:
+        symbols = SECTOR_TOSS_SYMBOL.get(sid)
+        if not symbols:
             missing_symbol.append(sid)
             returns_by_sector[sid] = {m: None for m in months}
             continue
+        if isinstance(symbols, str):
+            symbols = [symbols]
 
-        print(f"[{sid}] {s['name_kr']} ({symbol}) 수집 중...")
-        candles = fetch_daily_history(token, symbol, since)
-        closes = month_end_closes(candles, [baseline_month] + months)
+        # 티커별 월간 수익률을 각각 계산한 뒤 동일가중 평균 (건설/기계처럼 복수 ETF 섹터 대응)
+        per_symbol_series = []
+        for symbol in symbols:
+            print(f"[{sid}] {s['name_kr']} ({symbol}) 수집 중...")
+            candles = fetch_daily_history(token, symbol, since)
+            closes = month_end_closes(candles, [baseline_month] + months)
 
-        series = {}
-        prev = closes.get(baseline_month)
+            series = {}
+            prev = closes.get(baseline_month)
+            for m in months:
+                cur = closes.get(m)
+                if cur is not None and prev is not None:
+                    series[m] = round((cur / prev - 1) * 100, 2)
+                else:
+                    series[m] = None
+                if cur is not None:
+                    prev = cur
+            per_symbol_series.append(series)
+
+        merged = {}
         for m in months:
-            cur = closes.get(m)
-            if cur is not None and prev is not None:
-                series[m] = round((cur / prev - 1) * 100, 2)
-            else:
-                series[m] = None
-            if cur is not None:
-                prev = cur
-        returns_by_sector[sid] = series
+            vals = [ser[m] for ser in per_symbol_series if ser[m] is not None]
+            merged[m] = round(sum(vals) / len(vals), 2) if vals else None
+        returns_by_sector[sid] = merged
 
     if missing_symbol:
         print(f"심볼 미설정으로 건너뜀: {', '.join(missing_symbol)}", file=sys.stderr)

@@ -106,11 +106,29 @@ TRACK_D_ETF_PROXY = {
 
 # scripts/fetch_toss_data.py가 사용하는 최종 심볼 맵.
 # 토스증권 Open API /api/v1/candles의 symbol 파라미터에 그대로 들어간다 (KR: 6자리 종목코드).
-# TRACK_D_ETF_PROXY에서 confirmed인 4개는 채워져 있음. 나머지 15개는 None이며,
-# TOSS_SEARCH_HINTS 키워드로 토스 앱에서 검색해 확인한 티커를 직접 채워 넣을 것.
+# 2026-07-06 사용자 제공 큐레이션(각 섹터 대표 ETF, AUM/유동성 기준)으로 19개 전체 확정.
+# 값이 list이면 여러 ETF 월간 수익률의 동일가중 평균으로 계산한다 (건설/기계).
+# ETF 상장일 이전 월은 자동으로 null 처리됨.
 SECTOR_TOSS_SYMBOL = {
-    s["id"]: (TRACK_D_ETF_PROXY[s["id"]]["tickers"][0] if s["id"] in TRACK_D_ETF_PROXY else None)
-    for s in SECTORS
+    "semis": "091160",                    # KODEX 반도체
+    "semi_equip": "455850",               # SOL 반도체소부장Fn
+    "battery": "305720",                  # KODEX 2차전지산업
+    "power_equip": "486450",              # KODEX AI전력핵심설비
+    "cosmetics": "228790",                # TIGER 화장품
+    "defense": "449450",                  # ARIRANG K방산Fn (490480 SOL K방산보다 이력 길어 교체)
+    "shipbuilding": "466930",             # KODEX K-조선
+    "auto_parts": "093240",               # KODEX 자동차 (완성차+부품 포괄)
+    "steel": "117680",                    # KODEX 철강
+    "chemicals": "139270",                # TIGER 화학
+    "banks": "091220",                    # TIGER 은행
+    "securities": "102970",               # KODEX 증권
+    "pharma": "266420",                   # KODEX 헬스케어
+    "biotech": "261070",                  # TIGER 코스닥150바이오테크
+    "internet": "157490",                 # TIGER 소프트웨어
+    "gaming": "300950",                   # KODEX 게임산업
+    "telecom": "139290",                  # TIGER 방송통신
+    "power_utility": None,                # 미확정 — 대표 ETF 미지정 (TOSS_SEARCH_HINTS 참고)
+    "construction_machinery": ["117700", "102960"],  # KODEX 건설 + KODEX 기계장비 평균
 }
 
 # Track A/D 티커가 없는 나머지 세부업종용 — 토스증권 앱에서 검색해볼 키워드 제안.
