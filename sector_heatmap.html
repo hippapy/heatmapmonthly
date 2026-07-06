@@ -186,26 +186,43 @@
   tbody th.sector-col .row-label { display: flex; align-items: center; gap: 8px; }
   td.cell {
     position: relative;
-    min-width: 58px;
-    height: 40px;
+    min-width: 94px;
+    height: 46px;
+    padding: 3px 5px;
     text-align: center;
-    font-size: 11.5px;
     font-variant-numeric: tabular-nums;
     border-bottom: 1px solid var(--border);
-    border-right: 1px solid rgba(255,255,255,0.03);
-    color: #f4f6fb;
+    border-right: 1px solid rgba(255,255,255,0.05);
+    color: #f6f8fc;
     transition: filter 0.15s ease;
   }
-  td.cell .rank-badge {
+  td.cell .sname {
+    display: block;
+    font-size: 10px;
+    line-height: 1.15;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.92;
+  }
+  td.cell .val { display: block; font-size: 12px; font-weight: 700; margin-top: 1px; }
+  td.cell .move {
     position: absolute;
     top: 2px;
-    left: 3px;
-    font-size: 8.5px;
+    right: 4px;
+    font-size: 8px;
     line-height: 1;
-    color: rgba(255,255,255,0.55);
     font-weight: 700;
   }
-  td.cell .val { display: block; padding-top: 4px; }
+  td.cell .move.up { color: #8ff0c0; }
+  td.cell .move.down { color: #ffb0b0; }
+  td.cell .move.flat { color: rgba(255,255,255,0.4); }
+  td.cell.dimmed-cell { filter: grayscale(1); opacity: 0.18; }
+  td.cell.dimmed-cell:hover { filter: grayscale(1) brightness(1.1); opacity: 0.35; }
+  td.cell:hover { filter: brightness(1.14); }
+  .sector-col.rank-col { text-align: center; padding: 7px 6px; min-width: 52px; font-weight: 700; color: var(--text-dim); }
+  .mode-note { font-size: 12px; color: var(--text-dim); }
   td.cell.negative { background-image: repeating-linear-gradient(135deg, rgba(0,0,0,0.22) 0 3px, transparent 3px 7px); background-blend-mode: multiply; }
   td.cell.negative .val::before { content: ''; }
   td.cell.na { color: var(--text-muted); }
@@ -251,9 +268,7 @@
       <div class="sample-banner" id="sampleBanner" style="display:none;"></div>
     </div>
     <div class="controls">
-      <label for="sortSelect">정렬 기준</label>
-      <select id="sortSelect"></select>
-      <button id="latestSortBtn">최근월 기준 정렬</button>
+      <span class="mode-note">매월 수익률 내림차순 순위표 (행=순위 고정, 열=월)</span>
       <button id="exportBtn" class="primary">CSV 내보내기</button>
     </div>
   </header>
@@ -272,10 +287,10 @@
 
     <div class="table-outer">
       <div class="legend-strip" style="padding: 12px 14px 0;">
-        <div class="item"><span class="legend-swatch" style="background:hsl(210 65% 55% / 0.15)"></span> 약한 등락</div>
-        <div class="item"><span class="legend-swatch" style="background:hsl(210 65% 55% / 1)"></span> 강한 등락 (섹터 고유색, 진할수록 절대값 큼)</div>
+        <div class="item">행 = 그 달의 수익률 순위 (맨 위 = 1위)</div>
+        <div class="item"><span class="legend-swatch" style="background:hsl(210 65% 55% / 1)"></span> 셀 = 섹터 고유색 (진할수록 |수익률| 큼)</div>
         <div class="item"><span class="legend-swatch neg-pattern"></span> 마이너스(사선 패턴)</div>
-        <div class="item">셀 좌상단 숫자 = 해당 월 순위(1~19위)</div>
+        <div class="item"><span class="move up" style="position:static">▲</span>/<span class="move down" style="position:static">▼</span> 셀 우상단 = 전월 대비 순위 이동</div>
       </div>
       <div class="table-wrap">
         <table>
@@ -291,8 +306,9 @@
   </div>
 
   <footer class="page-footer">
-    월간 수익률 정의: 월말 종가 기준 전월 대비 수익률. 색상은 19개 세부업종에 색상환을 균등 분배한 고유색이며,
-    같은 색 내 명도/채도(불투명도)로 수익률 강도를 표현합니다. 필터에서 해제한 업종은 회색조로 다운플레이됩니다.
+    날짜(열)는 고정하고, 각 월 컬럼 안에서 그 달 수익률 내림차순으로 세부업종을 재배치한 순위표입니다.
+    행은 순위(맨 위 1위), 셀 색은 세부업종 고유색이라 매달 색이 위아래로 움직이는 흐름으로 섹터 로테이션을 읽을 수 있습니다.
+    색이 진할수록 |수익률|이 크고, 마이너스는 사선 패턴으로 구분합니다. 필터에서 해제한 업종은 회색조로 다운플레이됩니다.
   </footer>
 </div>
 
@@ -301,7 +317,6 @@ const FALLBACK_DATA = {"meta": {"title": "국내 주식시장 세부업종 월�
 
 let DATA = null;
 let selected = new Set();
-let sortMode = 'avg'; // 'avg' | a month string like '2026-06'
 
 async function loadData() {
   try {
@@ -323,24 +338,6 @@ async function loadData() {
   init();
 }
 
-function avgReturn(sectorId) {
-  const series = DATA.returns[sectorId];
-  const vals = DATA.months.map(m => series[m]).filter(v => v !== null && v !== undefined);
-  if (!vals.length) return null;
-  return vals.reduce((a,b) => a+b, 0) / vals.length;
-}
-
-function monthRanking(month) {
-  // 전체 섹터 기준 실제 순위 (필터와 무관하게 항상 시장 전체 기준)
-  const rows = DATA.sectors
-    .map(s => ({ id: s.id, v: DATA.returns[s.id][month] }))
-    .filter(r => r.v !== null && r.v !== undefined)
-    .sort((a,b) => b.v - a.v);
-  const rankMap = {};
-  rows.forEach((r, i) => rankMap[r.id] = i + 1);
-  return rankMap;
-}
-
 function globalMaxAbs() {
   // 색상 강도 기준값. 단일 이상치가 전체 대비를 무너뜨리지 않도록 95%분위수로 캡한다
   // (이 값을 넘는 셀은 opacity 1로 clamp됨). 데이터가 적으면 단순 최대값 사용.
@@ -357,38 +354,40 @@ function globalMaxAbs() {
   return p95 || abs[abs.length - 1] || 1;
 }
 
-function sortedSectorIds() {
-  const ids = DATA.sectors.map(s => s.id);
-  if (sortMode === 'avg') {
-    return ids.slice().sort((a,b) => (avgReturn(b) ?? -999) - (avgReturn(a) ?? -999));
-  }
-  return ids.slice().sort((a,b) => {
-    const av = DATA.returns[a][sortMode], bv = DATA.returns[b][sortMode];
-    return (bv ?? -999) - (av ?? -999);
+// 좁은 셀에 들어갈 짧은 표기 (데이터는 건드리지 않고 표시용으로만)
+const SECTOR_SHORT = {
+  semis: '반도체', semi_equip: '반도체소부장', battery: '2차전지', power_equip: '전력기기',
+  cosmetics: '화장품', defense: '방위산업', shipbuilding: '조선', auto_parts: '자동차부품',
+  steel: '철강', chemicals: '화학소재', banks: '은행', securities: '증권', pharma: '제약',
+  biotech: '바이오텍', internet: '인터넷', gaming: '게임', telecom: '통신서비스',
+  power_utility: '전력유틸', construction_machinery: '건설/기계',
+};
+function shortName(sid) {
+  return SECTOR_SHORT[sid] || (DATA.sectors.find(s => s.id === sid) || {}).name_kr || sid;
+}
+
+// 월별 수익률 내림차순 정렬 결과와 최대 순위 깊이를 한 번에 계산
+function computeRankTable() {
+  const months = DATA.months;
+  const rankedByMonth = {};   // month -> [sid...] (수익률 내림차순, null 제외)
+  const rankLookup = {};      // month -> {sid: rankIndex}
+  let depth = 0;
+  months.forEach(m => {
+    const arr = DATA.sectors.map(s => s.id)
+      .filter(sid => DATA.returns[sid][m] !== null && DATA.returns[sid][m] !== undefined)
+      .sort((a, b) => DATA.returns[b][m] - DATA.returns[a][m]);
+    rankedByMonth[m] = arr;
+    rankLookup[m] = {};
+    arr.forEach((sid, i) => rankLookup[m][sid] = i);
+    depth = Math.max(depth, arr.length);
   });
+  return { rankedByMonth, rankLookup, depth };
 }
 
 function fmtPct(v) {
   if (v === null || v === undefined) return '—';
   const sign = v > 0 ? '+' : '';
   return `${sign}${v.toFixed(1)}%`;
-}
-
-function buildSortOptions() {
-  const sel = document.getElementById('sortSelect');
-  sel.innerHTML = '';
-  const optAvg = document.createElement('option');
-  optAvg.value = 'avg';
-  optAvg.textContent = '전체 기간 평균 수익률';
-  sel.appendChild(optAvg);
-  DATA.months.forEach(m => {
-    const o = document.createElement('option');
-    o.value = m;
-    o.textContent = `${m} 기준`;
-    sel.appendChild(o);
-  });
-  sel.value = sortMode;
-  sel.addEventListener('change', () => { sortMode = sel.value; render(); });
 }
 
 function buildFilterPanel() {
@@ -448,62 +447,74 @@ function renderSummary() {
 function render() {
   const months = DATA.months;
   const maxAbs = globalMaxAbs();
-  const order = sortedSectorIds();
-  const rankByMonth = {};
-  months.forEach(m => rankByMonth[m] = monthRanking(m));
+  const bySid = Object.fromEntries(DATA.sectors.map(s => [s.id, s]));
+  const { rankedByMonth, rankLookup, depth } = computeRankTable();
 
-  // header
+  // header: 순위 컬럼 + 월(고정)
   const headRow = document.getElementById('headRow');
-  headRow.innerHTML = `<th class="sector-col">세부업종 (${order.length}/${DATA.sectors.length})</th>` +
+  headRow.innerHTML = `<th class="sector-col rank-col">순위</th>` +
     months.map(m => `<th>${m}</th>`).join('');
 
-  // body
-  const bySid = Object.fromEntries(DATA.sectors.map(s => [s.id, s]));
+  // body: 행 = 순위(1..depth), 각 월 컬럼 안에서 그 달 수익률 내림차순으로 섹터 배치
   const bodyRows = document.getElementById('bodyRows');
-  bodyRows.innerHTML = order.map(sid => {
-    const s = bySid[sid];
-    const dimmed = selected.size > 0 && !selected.has(sid);
-    const cells = months.map(m => {
+  let html = '';
+  for (let r = 0; r < depth; r++) {
+    const cells = months.map((m, mi) => {
+      const sid = rankedByMonth[m][r];
+      if (sid === undefined) return `<td class="cell na"></td>`;
+      const s = bySid[sid];
       const v = DATA.returns[sid][m];
-      if (v === null || v === undefined) {
-        return `<td class="cell na"><span class="val">—</span></td>`;
-      }
       const alpha = Math.min(1, Math.abs(v) / maxAbs);
-      const bg = s.color.replace(')', ` / ${alpha.toFixed(3)})`).replace('hsl(', 'hsl(');
-      const rank = rankByMonth[m][sid];
+      const bg = s.color.replace(')', ` / ${alpha.toFixed(3)})`);
+      const dimmed = selected.size > 0 && !selected.has(sid);
       const negClass = v < 0 ? 'negative' : '';
-      return `<td class="cell ${negClass}" style="background:${bg}">
-        <span class="rank-badge">${rank ?? ''}</span>
+
+      // 전월 대비 순위 이동 (▲ 상승 / ▼ 하락 / – 동일 / NEW 신규 진입)
+      let move = '';
+      if (mi > 0) {
+        const prevRank = rankLookup[months[mi - 1]][sid];
+        if (prevRank === undefined) move = `<span class="move up">NEW</span>`;
+        else if (prevRank - r > 0) move = `<span class="move up">▲${prevRank - r}</span>`;
+        else if (prevRank - r < 0) move = `<span class="move down">▼${r - prevRank}</span>`;
+        else move = `<span class="move flat">–</span>`;
+      }
+
+      return `<td class="cell ${negClass} ${dimmed ? 'dimmed-cell' : ''}" style="background:${bg}" title="${s.name_kr} ${fmtPct(v)}">
+        ${move}
+        <span class="sname">${shortName(sid)}</span>
         <span class="val">${fmtPct(v)}</span>
       </td>`;
     }).join('');
-    return `<tr class="${dimmed ? 'dimmed' : ''}">
-      <th class="sector-col"><span class="row-label"><span class="dot" style="background:${s.color}"></span>${s.name_kr}</span></th>
-      ${cells}
-    </tr>`;
-  }).join('');
+    html += `<tr><th class="sector-col rank-col">${r + 1}</th>${cells}</tr>`;
+  }
+  bodyRows.innerHTML = html;
+}
+
+function csvCell(s) {
+  s = String(s);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 function exportCsv() {
   const months = DATA.months;
-  const order = sortedSectorIds().filter(sid => selected.size === 0 || selected.has(sid));
   const bySid = Object.fromEntries(DATA.sectors.map(s => [s.id, s]));
-  const header = ['세부업종', ...months];
-  const lines = [header.join(',')];
-  order.forEach(sid => {
-    const s = bySid[sid];
-    const row = [s.name_kr, ...months.map(m => {
-      const v = DATA.returns[sid][m];
-      return (v === null || v === undefined) ? '' : v;
+  const { rankedByMonth, depth } = computeRankTable();
+  const header = ['순위', ...months];
+  const lines = [header.map(csvCell).join(',')];
+  for (let r = 0; r < depth; r++) {
+    const row = [String(r + 1), ...months.map(m => {
+      const sid = rankedByMonth[m][r];
+      if (sid === undefined) return '';
+      return `${bySid[sid].name_kr}(${fmtPct(DATA.returns[sid][m])})`;
     })];
-    lines.push(row.join(','));
-  });
+    lines.push(row.map(csvCell).join(','));
+  }
   const csv = '﻿' + lines.join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `sector_heatmap_${DATA.months[0]}_${DATA.months[DATA.months.length-1]}.csv`;
+  a.download = `sector_rank_${DATA.months[0]}_${DATA.months[DATA.months.length-1]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -525,16 +536,10 @@ function init() {
     banner.style.display = 'inline-flex';
   }
 
-  buildSortOptions();
   buildFilterPanel();
   renderSummary();
   render();
 
-  document.getElementById('latestSortBtn').onclick = () => {
-    sortMode = DATA.months[DATA.months.length - 1];
-    document.getElementById('sortSelect').value = sortMode;
-    render();
-  };
   document.getElementById('exportBtn').onclick = exportCsv;
 }
 
