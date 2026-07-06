@@ -117,7 +117,7 @@ SECTOR_TOSS_SYMBOL = {
     "cosmetics": "228790",                # TIGER 화장품
     "defense": "449450",                  # ARIRANG K방산Fn (490480 SOL K방산보다 이력 길어 교체)
     "shipbuilding": "466930",             # KODEX K-조선
-    "auto_parts": "093240",               # KODEX 자동차 (완성차+부품 포괄)
+    "auto_parts": "464600",               # 자동차 소부장 (구 093240 KODEX 자동차는 데이터 이상치로 교체)
     "steel": "117680",                    # KODEX 철강
     "chemicals": "139270",                # TIGER 화학
     "banks": "091220",                    # TIGER 은행
