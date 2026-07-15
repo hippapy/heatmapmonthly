@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>삼성전자 월별 거래량</title>
+<style>
+  :root {
+    color-scheme: light dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+  .viz-root {
+    /* ---- light (default) ---- */
+    --page:            #f9f9f7;
+    --surface-1:       #fcfcfb;
+    --text-primary:    #0b0b0b;
+    --text-secondary:  #52514e;
+    --text-muted:      #898781;
+    --grid:            #e1e0d9;
+    --baseline:        #c3c2b7;
+    --series-1:        #2a78d6;
+    --series-1-soft:   #cde2fb;
+    --border:          rgba(11,11,11,0.10);
+    --banner-bg:       #fff6e5;
+    --banner-bd:       #f0d089;
+    --banner-fg:       #6b4e00;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 28px 20px 48px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      --page:           #0d0d0d;
+      --surface-1:      #1a1a19;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --series-1:       #3987e5;
+      --series-1-soft:  #184f95;
+      --border:         rgba(255,255,255,0.10);
+      --banner-bg:      #2a2410;
+      --banner-bd:      #5c4d1c;
+      --banner-fg:      #f0d089;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    --page:           #0d0d0d;
+    --surface-1:      #1a1a19;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --series-1:       #3987e5;
+    --series-1-soft:  #184f95;
+    --border:         rgba(255,255,255,0.10);
+    --banner-bg:      #2a2410;
+    --banner-bd:      #5c4d1c;
+    --banner-fg:      #f0d089;
+  }
+
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin: 0 0 2px; }
+  .meta { color: var(--text-muted); font-size: 12.5px; margin: 0; }
+
+  .banner {
+    margin: 16px 0 4px;
+    padding: 12px 14px;
+    background: var(--banner-bg);
+    border: 1px solid var(--banner-bd);
+    color: var(--banner-fg);
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .banner code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    background: rgba(0,0,0,0.06);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  :root[data-theme="dark"] .banner code,
+  .viz-root .banner code { background: rgba(0,0,0,0.25); }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin: 18px 0 10px;
+  }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+  .seg button {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    font: inherit; font-size: 13px; color: var(--text-secondary);
+    padding: 7px 14px;
+  }
+  .seg button[aria-pressed="true"] { background: var(--series-1); color: #fff; }
+  .spacer { flex: 1; }
+
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px 6px 4px;
+  }
+  svg { display: block; width: 100%; height: auto; }
+  .col { transition: opacity .12s ease; }
+  .gridline { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+  .baseline { stroke: var(--baseline); stroke-width: 1; shape-rendering: crispEdges; }
+  .tick { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .xlab { fill: var(--text-secondary); font-size: 12px; }
+  .caplab { fill: var(--text-primary); font-size: 11.5px; font-weight: 600; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 20;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 10px; font-size: 12.5px; line-height: 1.5;
+    box-shadow: 0 6px 22px rgba(0,0,0,0.16);
+    opacity: 0; transition: opacity .1s ease; max-width: 240px;
+  }
+  .tooltip .tt-m { color: var(--text-secondary); font-size: 11.5px; margin-bottom: 2px; }
+  .tooltip .tt-v { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .tt-sub { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  caption { text-align: left; color: var(--text-secondary); font-size: 12.5px; padding: 6px 4px; }
+  th, td { text-align: right; padding: 7px 12px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--text-muted); font-weight: 600; }
+  .hidden { display: none; }
+
+  footer { margin-top: 18px; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+  footer .src { color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <header>
+    <h1 id="title">삼성전자(005930) 월별 거래량</h1>
+    <p class="subtitle" id="subtitle">KOSPI · 2026년 · 월별 거래량(주) 합계</p>
+    <p class="meta" id="meta"></p>
+  </header>
+
+  <div class="banner hidden" id="banner"></div>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="지표 선택">
+      <button id="btnVol" aria-pressed="true">거래량(주)</button>
+      <button id="btnVal" aria-pressed="false">거래대금(원)</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" role="group" aria-label="보기 선택">
+      <button id="btnChart" aria-pressed="true">차트</button>
+      <button id="btnTable" aria-pressed="false">표</button>
+    </div>
+  </div>
+
+  <div class="card" id="chartCard">
+    <svg id="chart" viewBox="0 0 920 420" preserveAspectRatio="xMidYMid meet"
+         role="img" aria-labelledby="title"></svg>
+  </div>
+
+  <div class="card hidden" id="tableCard" style="padding:6px 12px 10px;">
+    <table id="table"><caption id="tcap"></caption></table>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <footer>
+    <div class="src" id="footSrc"></div>
+    <div id="footNote">단위: 거래량=주, 거래대금=원. 월별 값은 해당 월 각 거래일의 일별 값 합계입니다.</div>
+    <div>KRX 공식 데이터 기준 · 투자 조언 아님</div>
+  </footer>
+</div>
+
+<script>
+const DATA_URL = "./data/samsung_2026_monthly_volume.json";
+const el = (id) => document.getElementById(id);
+let DATA = null, metric = "volume";
+
+// ---- number formatting (Korean units) ----
+function compact(n) {
+  if (n == null) return "—";
+  const a = Math.abs(n);
+  if (a >= 1e12) return (n / 1e12).toFixed(2).replace(/\.00$/, "") + "조";
+  if (a >= 1e8)  return (n / 1e8).toFixed(1).replace(/\.0$/, "") + "억";
+  if (a >= 1e4)  return Math.round(n / 1e4).toLocaleString("ko-KR") + "만";
+  return n.toLocaleString("ko-KR");
+}
+function fullNum(n, unit) {
+  if (n == null) return "데이터 없음";
+  return n.toLocaleString("ko-KR") + unit;
+}
+function monthLabel(m) { return String(parseInt(m.slice(5), 10)) + "월"; }
+const unitOf = (mt) => (mt === "volume" ? "주" : "원");
+const metricName = (mt) => (mt === "volume" ? "거래량" : "거래대금");
+
+// ---- load ----
+fetch(DATA_URL, { cache: "no-store" })
+  .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then((d) => { DATA = d; init(); })
+  .catch((e) => {
+    showBanner(
+      "데이터 파일을 불러오지 못했습니다 (" + e.message + "). " +
+      "이 페이지는 GitHub Pages 또는 로컬 웹서버(http)로 열어야 하며, " +
+      "<code>file://</code> 로 직접 열면 브라우저가 로컬 fetch를 차단합니다."
+    );
+  });
+
+function showBanner(html) {
+  const b = el("banner");
+  b.innerHTML = html;
+  b.classList.remove("hidden");
+}
+
+function init() {
+  const m = DATA.meta || {};
+  el("title").textContent = m.title || "삼성전자 월별 거래량";
+  const yr = m.year || "";
+  el("subtitle").textContent =
+    (m.market || "KOSPI") + " · " + yr + "년 · 월별 " + metricName(metric) + " 합계";
+  el("meta").textContent =
+    "종목코드 " + (m.ticker || "005930") +
+    (m.as_of ? " · 기준일 " + m.as_of : "");
+  el("footSrc").textContent = "데이터 출처: " + (m.source || "—");
+
+  const vals = DATA.months.map((mm) => DATA.volume[mm]);
+  const allEmpty = vals.every((v) => v == null);
+  if (allEmpty || m.is_sample) {
+    showBanner(
+      "<b>실데이터 미연동 상태입니다.</b> 아래 차트 골격은 준비돼 있고, 실제 수치는 " +
+      "네트워크가 열린 로컬 환경에서 다음을 실행하면 채워집니다:<br>" +
+      "<code>python scripts/fetch_samsung_volume.py</code>" +
+      " &nbsp;(또는 <code>--source krx-proxy</code>)<br>" +
+      "실행 후 <code>data/samsung_2026_monthly_volume.json</code> 이 갱신되고, 이 페이지를 " +
+      "새로고침하면 실데이터로 렌더링됩니다."
+    );
+  }
+
+  wireControls();
+  render();
+}
+
+function wireControls() {
+  const setPressed = (a, b) => { el(a).setAttribute("aria-pressed", "true"); el(b).setAttribute("aria-pressed", "false"); };
+  el("btnVol").onclick = () => { metric = "volume"; setPressed("btnVol", "btnVal"); render(); };
+  el("btnVal").onclick = () => { metric = "value"; setPressed("btnVal", "btnVol"); render(); };
+  el("btnChart").onclick = () => {
+    setPressed("btnChart", "btnTable");
+    el("chartCard").classList.remove("hidden"); el("tableCard").classList.add("hidden");
+  };
+  el("btnTable").onclick = () => {
+    setPressed("btnTable", "btnChart");
+    el("tableCard").classList.remove("hidden"); el("chartCard").classList.add("hidden");
+    renderTable();
+  };
+}
+
+function render() {
+  const m = DATA.meta || {};
+  el("subtitle").textContent =
+    (m.market || "KOSPI") + " · " + (m.year || "") + "년 · 월별 " + metricName(metric) + " 합계";
+  renderChart();
+  if (!el("tableCard").classList.contains("hidden")) renderTable();
+}
+
+// ---- chart ----
+function niceTicks(max, count) {
+  if (max <= 0) return [0, 1];
+  const raw = max / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm >= 5 ? 10 : norm >= 2 ? 5 : norm >= 1 ? 2 : 1) * mag;
+  const ticks = [];
+  for (let t = 0; t <= max + step * 0.5; t += step) ticks.push(t);
+  return ticks;
+}
+
+function renderChart() {
+  const svg = el("chart");
+  const W = 920, H = 420;
+  const pad = { top: 28, right: 20, bottom: 40, left: 64 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+  const months = DATA.months;
+  const series = months.map((mm) => DATA[metric][mm]);
+  const unit = unitOf(metric);
+  const maxV = Math.max(0, ...series.map((v) => v == null ? 0 : v));
+  const hasData = series.some((v) => v != null);
+  const ticks = niceTicks(maxV || 1, 4);
+  const top = ticks[ticks.length - 1] || 1;
+  const y = (v) => pad.top + plotH - (v / top) * plotH;
+
+  const band = plotW / months.length;
+  const barW = Math.min(24, band * 0.55);
+
+  let s = "";
+  // gridlines + y ticks
+  for (const t of ticks) {
+    const yy = y(t);
+    s += `<line class="gridline" x1="${pad.left}" y1="${yy}" x2="${pad.left + plotW}" y2="${yy}"/>`;
+    s += `<text class="tick" x="${pad.left - 10}" y="${yy + 4}" text-anchor="end">${hasData ? compact(t) : ""}</text>`;
+  }
+  // baseline
+  s += `<line class="baseline" x1="${pad.left}" y1="${y(0)}" x2="${pad.left + plotW}" y2="${y(0)}"/>`;
+
+  // columns
+  const maxIdx = series.indexOf(Math.max(...series.map((v) => v == null ? -1 : v)));
+  months.forEach((mm, i) => {
+    const cx = pad.left + band * i + band / 2;
+    const v = series[i];
+    // x label
+    s += `<text class="xlab" x="${cx}" y="${pad.top + plotH + 22}" text-anchor="middle">${monthLabel(mm)}</text>`;
+    if (v == null || v <= 0) return;
+    const yy = y(v);
+    const h = y(0) - yy;
+    const x = cx - barW / 2;
+    const r = Math.min(4, h);
+    // rounded top, square bottom (baseline)
+    const path = `M${x},${yy + r} q0,${-r} ${r},${-r} h${barW - 2 * r} q${r},0 ${r},${r} v${h - r} h${-barW} Z`;
+    s += `<path class="col" data-i="${i}" d="${path}" fill="var(--series-1)"/>`;
+    // label the peak only (selective)
+    if (i === maxIdx) {
+      s += `<text class="caplab" x="${cx}" y="${yy - 7}" text-anchor="middle">${compact(v)}</text>`;
+    }
+  });
+
+  svg.innerHTML = s;
+
+  // hover
+  const tt = el("tooltip");
+  svg.querySelectorAll(".col").forEach((node) => {
+    const i = +node.getAttribute("data-i");
+    node.addEventListener("mousemove", (ev) => {
+      tt.innerHTML =
+        `<div class="tt-m">${DATA.meta.year}년 ${monthLabel(months[i])}</div>` +
+        `<div class="tt-v">${fullNum(series[i], unit)}</div>` +
+        `<div class="tt-sub">${metricName(metric)} · 월 합계</div>`;
+      tt.style.opacity = "1";
+      const off = 14;
+      let left = ev.clientX + off, tw = tt.offsetWidth;
+      if (left + tw > window.innerWidth - 8) left = ev.clientX - off - tw;
+      tt.style.left = left + "px";
+      tt.style.top = (ev.clientY + off) + "px";
+      svg.querySelectorAll(".col").forEach((n) => n.style.opacity = n === node ? "1" : "0.45");
+    });
+    node.addEventListener("mouseleave", () => {
+      tt.style.opacity = "0";
+      svg.querySelectorAll(".col").forEach((n) => n.style.opacity = "1");
+    });
+  });
+}
+
+// ---- table ----
+function renderTable() {
+  const months = DATA.months;
+  const unit = unitOf(metric);
+  el("tcap").textContent =
+    (DATA.meta.name || "삼성전자") + " " + (DATA.meta.year || "") + "년 월별 " + metricName(metric) + " (단위: " + unit + ")";
+  let h = "<thead><tr><th>월</th><th>" + metricName(metric) + " (" + unit + ")</th><th>요약</th></tr></thead><tbody>";
+  months.forEach((mm) => {
+    const v = DATA[metric][mm];
+    h += `<tr><td>${DATA.meta.year}-${mm.slice(5)}</td>` +
+         `<td>${v == null ? "—" : v.toLocaleString("ko-KR")}</td>` +
+         `<td>${v == null ? "—" : compact(v)}</td></tr>`;
+  });
+  h += "</tbody>";
+  el("table").innerHTML = "<caption id='tcap'>" + el("tcap").textContent + "</caption>" + h;
+}
+</script>
+</body>
+</html>
