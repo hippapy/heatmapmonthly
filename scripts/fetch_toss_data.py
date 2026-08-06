@@ -109,17 +109,31 @@ def month_end_closes(candles, months):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--since", default="2023-12-01", help="이 날짜까지의 일봉을 수집 (기준월 직전 월말 포함)")
+    ap.add_argument("--start-month", default="2024-01", help="표의 첫 컬럼 (YYYY-MM)")
+    ap.add_argument("--end-month", default="", help="표의 마지막 컬럼 (YYYY-MM). 미지정 시 '직전 완료월' 자동 계산")
     ap.add_argument("--out", default="data/sector_monthly_returns.json")
     args = ap.parse_args()
     since = datetime.strptime(args.since, "%Y-%m-%d").date()
 
+    start_y, start_m = map(int, args.start_month.split("-"))
+    if args.end_month:
+        end_y, end_m = map(int, args.end_month.split("-"))
+    else:
+        # 오늘 기준 직전 달까지 (이번 달은 아직 안 끝났으므로 제외)
+        today = datetime.now()
+        end_y, end_m = (today.year, today.month - 1) if today.month > 1 else (today.year - 1, 12)
+
     months = []
-    for y in (2024, 2025, 2026):
-        for m in range(1, 13):
-            if y == 2026 and m > 6:
-                continue
-            months.append(f"{y}-{m:02d}")
-    baseline_month = "2023-12"
+    y, m = start_y, start_m
+    while (y, m) <= (end_y, end_m):
+        months.append(f"{y}-{m:02d}")
+        m += 1
+        if m > 12:
+            y, m = y + 1, 1
+    # 기준월 = 첫 컬럼의 직전 달 (전월 대비 수익률 계산용)
+    by, bm = (start_y, start_m - 1) if start_m > 1 else (start_y - 1, 12)
+    baseline_month = f"{by}-{bm:02d}"
+    print(f"수집 기간: {months[0]} ~ {months[-1]} ({len(months)}개월), 기준월 {baseline_month}")
 
     token = get_access_token()
 
