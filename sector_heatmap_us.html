@@ -1,0 +1,537 @@
+<!-- sector_heatmap.html | GICS(근사) 세부업종 월별 수익률 히트맵 | Created: 2026-07-03 -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>미국 섹터 로테이션 히트맵 | GICS 11섹터 월별 수익률</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --surface2: #eef1f6;
+    --surface3: #e2e7ef;
+    --border: #d5dbe4;
+    --text: #1b2330;
+    --text-dim: #566072;
+    --text-muted: #8a93a3;
+    --accent: #3b6fd4;
+    --up: #12925a;
+    --down: #d34242;
+    --cell-ink: #14181f;
+    --radius: 10px;
+    --shadow: 0 2px 16px rgba(30,45,70,0.08);
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Pretendard', 'Malgun Gothic', sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    min-width: 1280px;
+  }
+
+  .wrap { max-width: 1760px; margin: 0 auto; padding: 20px 24px 60px; }
+
+  /* ---------- Header ---------- */
+  header.top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .title-block .subtitle { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+
+  .sample-banner {
+    margin-top: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #fdf3d7;
+    border: 1px solid #e6cf8f;
+    color: #8a6412;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 999px;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .controls label { font-size: 12px; color: var(--text-dim); }
+  select, button {
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  select:hover, button:hover { background: var(--surface3); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #ffffff; font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.ghost { background: transparent; }
+
+  /* ---------- Summary cards ---------- */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .summary-card h3 { font-size: 12px; color: var(--text-dim); font-weight: 600; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13px;
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-name { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .summary-val { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .summary-val.up { color: var(--up); }
+  .summary-val.down { color: var(--down); }
+
+  /* ---------- Layout: filter panel + table ---------- */
+  .layout { display: grid; grid-template-columns: 250px 1fr; gap: 18px; align-items: start; }
+
+  .filter-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    position: sticky;
+    top: 16px;
+  }
+  .filter-panel h3 { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .filter-actions { display: flex; gap: 6px; margin-bottom: 10px; }
+  .filter-actions button { flex: 1; font-size: 11px; padding: 5px 6px; }
+  .sector-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 4px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .sector-check:hover { background: var(--surface2); }
+  .sector-check input { accent-color: var(--accent); cursor: pointer; }
+  .sector-check .dot { width: 11px; height: 11px; }
+  .sector-check span.name { flex: 1; }
+
+  /* ---------- Table ---------- */
+  .table-outer {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface2);
+    color: var(--text-dim);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 9px 8px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    z-index: 2;
+  }
+  thead th.sector-col {
+    position: sticky;
+    left: 0;
+    top: 0;
+    z-index: 3;
+    text-align: left;
+    min-width: 168px;
+  }
+  tbody th.sector-col {
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+    z-index: 1;
+    text-align: left;
+    padding: 7px 10px;
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  tbody th.sector-col .row-label { display: flex; align-items: center; gap: 8px; }
+  td.cell {
+    position: relative;
+    min-width: 94px;
+    height: 46px;
+    padding: 3px 5px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid rgba(0,0,0,0.06);
+    color: var(--cell-ink);
+    transition: filter 0.15s ease;
+  }
+  td.cell .sname {
+    display: block;
+    font-size: 10px;
+    line-height: 1.15;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.92;
+  }
+  td.cell .val { display: block; font-size: 12px; font-weight: 700; margin-top: 1px; }
+  td.cell .move {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 8px;
+    line-height: 1;
+    font-weight: 700;
+  }
+  td.cell .move.up { color: #0c7a45; }
+  td.cell .move.down { color: #c02f2f; }
+  td.cell .move.flat { color: rgba(0,0,0,0.35); }
+  td.cell.dimmed-cell { filter: grayscale(1); opacity: 0.28; }
+  td.cell.dimmed-cell:hover { filter: grayscale(1) brightness(0.98); opacity: 0.5; }
+  td.cell:hover { filter: brightness(0.94) saturate(1.15); }
+  .sector-col.rank-col { text-align: center; padding: 7px 6px; min-width: 52px; font-weight: 700; color: var(--text-dim); }
+  .mode-note { font-size: 12px; color: var(--text-dim); }
+  td.cell.negative { background-image: repeating-linear-gradient(135deg, rgba(0,0,0,0.22) 0 3px, transparent 3px 7px); background-blend-mode: multiply; }
+  td.cell.negative .val::before { content: ''; }
+  td.cell.na { color: var(--text-muted); background: repeating-linear-gradient(135deg, rgba(0,0,0,0.03) 0 4px, transparent 4px 8px); }
+
+  .table-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    font-size: 11.5px;
+    color: var(--text-muted);
+  }
+
+  .legend-strip {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin: 14px 0 4px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+  }
+  .legend-strip .item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 16px; height: 12px; border-radius: 3px; }
+  .legend-strip .neg-pattern { background: hsl(220 10% 45%); background-image: repeating-linear-gradient(135deg, rgba(0,0,0,0.35) 0 3px, transparent 3px 7px); }
+
+  footer.page-footer { margin-top: 20px; font-size: 11.5px; color: var(--text-muted); line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="title-block">
+      <h1>미국 섹터 로테이션 히트맵 — GICS 11섹터(SPDR ETF) 월별 수익률</h1>
+      <div class="subtitle" id="periodLabel">기간 로딩 중...</div>
+      <div class="sample-banner" id="sampleBanner" style="display:none;"></div>
+    </div>
+    <div class="controls">
+      <span class="mode-note">매월 수익률 내림차순 순위표 (행=순위 고정, 열=월)</span>
+      <button id="exportBtn" class="primary">CSV 내보내기</button>
+    </div>
+  </header>
+
+  <section class="summary" id="summarySection"></section>
+
+  <div class="layout">
+    <aside class="filter-panel">
+      <h3>세부업종 필터</h3>
+      <div class="filter-actions">
+        <button id="selectAllBtn">전체 선택</button>
+        <button id="selectNoneBtn">전체 해제</button>
+      </div>
+      <div id="sectorChecklist"></div>
+    </aside>
+
+    <div class="table-outer">
+      <div class="legend-strip" style="padding: 12px 14px 0;">
+        <div class="item">행 = 그 달의 수익률 순위 (맨 위 = 1위)</div>
+        <div class="item"><span class="legend-swatch" style="background:hsl(210 62% 66%)"></span> 셀 색 = 세부업종 고유색 (모든 셀 동일 강도)</div>
+        <div class="item"><span class="legend-swatch neg-pattern"></span> 마이너스(사선 패턴)</div>
+        <div class="item"><span class="move up" style="position:static">▲</span>/<span class="move down" style="position:static">▼</span> 셀 우상단 = 전월 대비 순위 이동</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr id="headRow"></tr></thead>
+          <tbody id="bodyRows"></tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span id="sourceLabel">데이터 출처 로딩 중...</span>
+        <span id="asOfLabel"></span>
+      </div>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    날짜(열)는 고정하고, 각 월 컬럼 안에서 그 달 수익률 내림차순으로 세부업종을 재배치한 순위표입니다.
+    행은 순위(맨 위 1위), 셀 색은 세부업종 고유색을 모든 셀에 동일 강도로 칠하므로 매달 같은 색이 어느 순위에 있는지로 섹터 로테이션을 읽을 수 있습니다.
+    마이너스는 사선 패턴으로 구분하고, 수익률(%)은 셀 안에 그대로 표기됩니다. 필터에서 해제한 업종은 회색조로 다운플레이됩니다.
+  </footer>
+</div>
+
+<script>
+const FALLBACK_DATA = {"meta": {"title": "미국 주식시장 GICS 11섹터 월별 수익률", "period": {"start": "2024-10", "end": "2026-08"}, "unit": "percent", "return_definition": "월말 종가 기준 전월 대비 수익률 (SPDR 섹터 ETF, Polygon 일봉 기반)", "source": "Polygon (Massive.com) — SPDR Select Sector ETF 일별 종가", "as_of": "2026-09-18", "is_sample": false}, "sectors": [{"id": "tech", "name_kr": "기술(IT)·XLK", "name_en": "Technology (XLK)", "color": "hsl(0 65% 55%)"}, {"id": "comm", "name_kr": "커뮤니케이션·XLC", "name_en": "Communication Services (XLC)", "color": "hsl(33 65% 55%)"}, {"id": "cons_disc", "name_kr": "경기소비재·XLY", "name_en": "Consumer Discretionary (XLY)", "color": "hsl(65 65% 55%)"}, {"id": "cons_staples", "name_kr": "필수소비재·XLP", "name_en": "Consumer Staples (XLP)", "color": "hsl(98 65% 55%)"}, {"id": "health", "name_kr": "헬스케어·XLV", "name_en": "Health Care (XLV)", "color": "hsl(131 65% 55%)"}, {"id": "fin", "name_kr": "금융·XLF", "name_en": "Financials (XLF)", "color": "hsl(164 65% 55%)"}, {"id": "industrials", "name_kr": "산업재·XLI", "name_en": "Industrials (XLI)", "color": "hsl(196 65% 55%)"}, {"id": "energy", "name_kr": "에너지·XLE", "name_en": "Energy (XLE)", "color": "hsl(229 65% 55%)"}, {"id": "materials", "name_kr": "소재·XLB", "name_en": "Materials (XLB)", "color": "hsl(262 65% 55%)"}, {"id": "reit", "name_kr": "부동산·XLRE", "name_en": "Real Estate (XLRE)", "color": "hsl(295 65% 55%)"}, {"id": "utilities", "name_kr": "유틸리티·XLU", "name_en": "Utilities (XLU)", "color": "hsl(327 65% 55%)"}], "months": ["2024-10", "2024-11", "2024-12", "2025-01", "2025-02", "2025-03", "2025-04", "2025-05", "2025-06", "2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08"], "returns": {"tech": {"2024-10": -1.56, "2024-11": 5.17, "2024-12": -0.52, "2025-01": -0.74, "2025-02": -2.29, "2025-03": -8.45, "2025-04": 1.69, "2025-05": 9.97, "2025-06": 9.67, "2025-07": 3.76, "2025-08": -0.11, "2025-09": 7.4, "2025-10": 6.68, "2025-11": -4.81, "2025-12": 0.6, "2026-01": -0.06, "2026-02": -3.56, "2026-03": -4.22, "2026-04": 20.02, "2026-05": 19.76, "2026-06": -0.26, "2026-07": -7.96, "2026-08": 6.36}, "comm": {"2024-10": 1.81, "2024-11": 6.91, "2024-12": -1.62, "2025-01": 5.75, "2025-02": -0.37, "2025-03": -5.44, "2025-04": -1.05, "2025-05": 6.24, "2025-06": 7.03, "2025-07": -1.03, "2025-08": 3.71, "2025-09": 6.27, "2025-10": -3.01, "2025-11": 0.51, "2025-12": 2.02, "2026-01": 2.0, "2026-02": -1.69, "2026-03": -6.09, "2026-04": 5.1, "2026-05": -0.7, "2026-06": -7.4, "2026-07": 1.04, "2026-08": 2.97}, "cons_disc": {"2024-10": -1.74, "2024-11": 12.91, "2024-12": 0.92, "2025-01": 3.49, "2025-02": -6.98, "2025-03": -8.57, "2025-04": -0.1, "2025-05": 8.38, "2025-06": 1.65, "2025-07": 1.89, "2025-08": 4.66, "2025-09": 3.41, "2025-10": 0.12, "2025-11": -1.45, "2025-12": 1.0, "2026-01": 1.47, "2026-02": -3.56, "2026-03": -6.74, "2026-04": 8.6, "2026-05": 2.13, "2026-06": -2.97, "2026-07": -1.01, "2026-08": 0.43}, "cons_staples": {"2024-10": -3.47, "2024-11": 3.87, "2024-12": -5.54, "2025-01": 0.47, "2025-02": 5.19, "2025-03": -1.7, "2025-04": 0.2, "2025-05": 1.22, "2025-06": -2.25, "2025-07": -1.47, "2025-08": 1.25, "2025-09": -2.98, "2025-10": -2.67, "2025-11": 4.05, "2025-12": -2.13, "2026-01": 7.51, "2026-02": 7.78, "2026-03": -8.92, "2026-04": 2.84, "2026-05": -1.66, "2026-06": 0.19, "2026-07": 2.38, "2026-08": -0.08}, "health": {"2024-10": -4.64, "2024-11": 0.37, "2024-12": -6.68, "2025-01": 6.76, "2025-02": 1.4, "2025-03": -1.96, "2025-04": -3.79, "2025-05": -5.57, "2025-06": 1.62, "2025-07": -3.23, "2025-08": 5.37, "2025-09": 1.27, "2025-10": 3.65, "2025-11": 9.29, "2025-12": -1.81, "2026-01": -0.04, "2026-02": 3.53, "2026-03": -8.48, "2026-04": -0.42, "2026-05": 2.38, "2026-06": 6.15, "2026-07": 2.45, "2026-08": 4.92}, "fin": {"2024-10": 2.56, "2024-11": 10.46, "2024-12": -5.86, "2025-01": 6.5, "2025-02": 1.38, "2025-03": -4.54, "2025-04": -2.11, "2025-05": 4.51, "2025-06": 2.77, "2025-07": 0.0, "2025-08": 3.09, "2025-09": -0.22, "2025-10": -2.78, "2025-11": 1.83, "2025-12": 2.7, "2026-01": -2.43, "2026-02": -3.76, "2026-03": -4.01, "2026-04": 5.59, "2026-05": -1.06, "2026-06": 3.94, "2026-07": 6.21, "2026-08": 1.35}, "industrials": {"2024-10": -1.19, "2024-11": 7.59, "2024-12": -8.49, "2025-01": 5.0, "2025-02": -1.46, "2025-03": -3.86, "2025-04": 0.11, "2025-05": 8.84, "2025-06": 3.29, "2025-07": 3.04, "2025-08": 0.0, "2025-09": 1.46, "2025-10": 0.54, "2025-11": -0.88, "2025-12": 0.93, "2026-01": 6.65, "2026-02": 7.07, "2026-03": -8.7, "2026-04": 7.95, "2026-05": -0.83, "2026-06": 6.99, "2026-07": -2.91, "2026-08": -2.62}, "energy": {"2024-10": 0.9, "2024-11": 7.83, "2024-12": -10.33, "2025-01": 2.31, "2025-02": 3.83, "2025-03": 2.69, "2025-04": -13.86, "2025-05": 1.28, "2025-06": 4.02, "2025-07": 2.83, "2025-08": 3.65, "2025-09": -1.16, "2025-10": -1.35, "2025-11": 2.63, "2025-12": -1.14, "2026-01": 14.18, "2026-02": 9.54, "2026-03": 9.55, "2026-04": -2.63, "2026-05": -5.63, "2026-06": -5.65, "2026-07": 12.13, "2026-08": 7.41}, "materials": {"2024-10": -3.1, "2024-11": 1.49, "2024-12": -11.23, "2025-01": 5.53, "2025-02": -0.03, "2025-03": -3.13, "2025-04": -2.43, "2025-05": 2.92, "2025-06": 1.7, "2025-07": -0.09, "2025-08": 5.19, "2025-09": -2.88, "2025-10": -4.41, "2025-11": 4.35, "2025-12": 1.45, "2026-01": 8.64, "2026-02": 8.4, "2026-03": -6.44, "2026-04": 3.0, "2026-05": -0.62, "2026-06": -0.63, "2026-07": -0.79, "2026-08": 4.48}, "reit": {"2024-10": -3.29, "2024-11": 4.17, "2024-12": -9.62, "2025-01": 1.84, "2025-02": 4.18, "2025-03": -3.01, "2025-04": -1.31, "2025-05": 1.04, "2025-06": -0.74, "2025-07": -0.02, "2025-08": 2.17, "2025-09": -0.43, "2025-10": -2.92, "2025-11": 1.88, "2025-12": -3.17, "2026-01": 2.68, "2026-02": 5.82, "2026-03": -6.87, "2026-04": 8.74, "2026-05": -0.92, "2026-06": 0.09, "2026-07": 2.36, "2026-08": -2.13}, "utilities": {"2024-10": -1.08, "2024-11": 3.78, "2024-12": -8.73, "2025-01": 2.89, "2025-02": 1.72, "2025-03": -0.47, "2025-04": 0.06, "2025-05": 3.83, "2025-06": -0.32, "2025-07": 4.91, "2025-08": -1.58, "2025-09": 3.43, "2025-10": 2.17, "2025-11": 1.72, "2025-12": -5.79, "2026-01": 1.31, "2026-02": 10.36, "2026-03": -3.86, "2026-04": 2.09, "2026-05": -5.19, "2026-06": 2.07, "2026-07": -2.18, "2026-08": -4.78}}};
+
+let DATA = null;
+let selected = new Set();
+
+async function loadData() {
+  try {
+    const controller = new AbortController();
+    // 일부 실행 환경(파일 미리보기, 샌드박스 등)에서는 fetch가 실패도 성공도 하지 않고
+    // 무한정 멈출 수 있어 하드 타임아웃으로 강제 진행시킨다.
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch('data/us_sector_monthly_returns.json', {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('fetch failed');
+    DATA = await res.json();
+  } catch (e) {
+    // file:// 로 열었을 때 로컬 fetch가 CORS로 막히거나 타임아웃되는 경우 — 인라인 데이터로 폴백
+    DATA = FALLBACK_DATA;
+  }
+  init();
+}
+
+// 셀 배경: 섹터 고유색을 모든 셀에 동일 강도로. 어두운 글자 가독성을 위해 명도만 살짝 올림.
+// (수익률 크기를 색 진하기로 인코딩하지 않음 — 섹터 위치 추적이 목적)
+function cellBg(color) {
+  const m = color.match(/hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/);
+  if (!m) return color;
+  return `hsl(${m[1]} 62% 66%)`;
+}
+
+// 좁은 셀에 들어갈 짧은 표기 (데이터는 건드리지 않고 표시용으로만)
+const SECTOR_SHORT = {"tech": "기술(IT)", "comm": "커뮤니케이션", "cons_disc": "경기소비재", "cons_staples": "필수소비재", "health": "헬스케어", "fin": "금융", "industrials": "산업재", "energy": "에너지", "materials": "소재", "reit": "부동산", "utilities": "유틸리티"};
+function shortName(sid) {
+  return SECTOR_SHORT[sid] || (DATA.sectors.find(s => s.id === sid) || {}).name_kr || sid;
+}
+
+// 월별 수익률 내림차순 정렬 결과와 최대 순위 깊이를 한 번에 계산
+function computeRankTable() {
+  const months = DATA.months;
+  const rankedByMonth = {};   // month -> [sid...] (수익률 내림차순, null 제외)
+  const rankLookup = {};      // month -> {sid: rankIndex}
+  let depth = 0;
+  months.forEach(m => {
+    const arr = DATA.sectors.map(s => s.id)
+      .filter(sid => DATA.returns[sid][m] !== null && DATA.returns[sid][m] !== undefined)
+      .sort((a, b) => DATA.returns[b][m] - DATA.returns[a][m]);
+    rankedByMonth[m] = arr;
+    rankLookup[m] = {};
+    arr.forEach((sid, i) => rankLookup[m][sid] = i);
+    depth = Math.max(depth, arr.length);
+  });
+  return { rankedByMonth, rankLookup, depth };
+}
+
+function fmtPct(v) {
+  if (v === null || v === undefined) return '—';
+  const sign = v > 0 ? '+' : '';
+  return `${sign}${v.toFixed(1)}%`;
+}
+
+function buildFilterPanel() {
+  const box = document.getElementById('sectorChecklist');
+  box.innerHTML = '';
+  DATA.sectors.forEach(s => {
+    const label = document.createElement('label');
+    label.className = 'sector-check';
+    label.innerHTML = `
+      <input type="checkbox" data-id="${s.id}" ${selected.has(s.id) ? 'checked' : ''}>
+      <span class="dot" style="background:${s.color}"></span>
+      <span class="name">${s.name_kr}</span>
+    `;
+    label.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) selected.add(s.id); else selected.delete(s.id);
+      render();
+    });
+    box.appendChild(label);
+  });
+
+  document.getElementById('selectAllBtn').onclick = () => {
+    selected = new Set(DATA.sectors.map(s => s.id));
+    buildFilterPanel();
+    render();
+  };
+  document.getElementById('selectNoneBtn').onclick = () => {
+    selected = new Set();
+    buildFilterPanel();
+    render();
+  };
+}
+
+function renderSummary() {
+  const latest = DATA.months[DATA.months.length - 1];
+  const ranked = DATA.sectors
+    .map(s => ({ ...s, v: DATA.returns[s.id][latest] }))
+    .filter(r => r.v !== null && r.v !== undefined)
+    .sort((a,b) => b.v - a.v);
+  const top3 = ranked.slice(0, 3);
+  const bottom3 = ranked.slice(-3).reverse();
+
+  const card = (title, rows) => `
+    <div class="summary-card">
+      <h3>${title} — ${latest} 기준</h3>
+      ${rows.map(r => `
+        <div class="summary-row">
+          <span class="summary-name"><span class="dot" style="background:${r.color}"></span>${r.name_kr}</span>
+          <span class="summary-val ${r.v >= 0 ? 'up' : 'down'}">${fmtPct(r.v)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  document.getElementById('summarySection').innerHTML =
+    card('Top 3 섹터', top3) + card('Bottom 3 섹터', bottom3);
+}
+
+function render() {
+  const months = DATA.months;
+  const bySid = Object.fromEntries(DATA.sectors.map(s => [s.id, s]));
+  const { rankedByMonth, rankLookup, depth } = computeRankTable();
+
+  // header: 순위 컬럼 + 월(고정)
+  const headRow = document.getElementById('headRow');
+  headRow.innerHTML = `<th class="sector-col rank-col">순위</th>` +
+    months.map(m => `<th>${m}</th>`).join('');
+
+  // body: 행 = 순위(1..depth), 각 월 컬럼 안에서 그 달 수익률 내림차순으로 섹터 배치
+  const bodyRows = document.getElementById('bodyRows');
+  let html = '';
+  for (let r = 0; r < depth; r++) {
+    const cells = months.map((m, mi) => {
+      const sid = rankedByMonth[m][r];
+      if (sid === undefined) return `<td class="cell na"></td>`;
+      const s = bySid[sid];
+      const v = DATA.returns[sid][m];
+      const bg = cellBg(s.color);   // 모든 셀 동일 강도 (섹터 고유색만으로 위치 추적)
+      const dimmed = selected.size > 0 && !selected.has(sid);
+      const negClass = v < 0 ? 'negative' : '';
+
+      // 전월 대비 순위 이동 (▲ 상승 / ▼ 하락 / – 동일 / NEW 신규 진입)
+      let move = '';
+      if (mi > 0) {
+        const prevRank = rankLookup[months[mi - 1]][sid];
+        if (prevRank === undefined) move = `<span class="move up">NEW</span>`;
+        else if (prevRank - r > 0) move = `<span class="move up">▲${prevRank - r}</span>`;
+        else if (prevRank - r < 0) move = `<span class="move down">▼${r - prevRank}</span>`;
+        else move = `<span class="move flat">–</span>`;
+      }
+
+      return `<td class="cell ${negClass} ${dimmed ? 'dimmed-cell' : ''}" style="background:${bg}" title="${s.name_kr} ${fmtPct(v)}">
+        ${move}
+        <span class="sname">${shortName(sid)}</span>
+        <span class="val">${fmtPct(v)}</span>
+      </td>`;
+    }).join('');
+    html += `<tr><th class="sector-col rank-col">${r + 1}</th>${cells}</tr>`;
+  }
+  bodyRows.innerHTML = html;
+}
+
+function csvCell(s) {
+  s = String(s);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function exportCsv() {
+  const months = DATA.months;
+  const bySid = Object.fromEntries(DATA.sectors.map(s => [s.id, s]));
+  const { rankedByMonth, depth } = computeRankTable();
+  const header = ['순위', ...months];
+  const lines = [header.map(csvCell).join(',')];
+  for (let r = 0; r < depth; r++) {
+    const row = [String(r + 1), ...months.map(m => {
+      const sid = rankedByMonth[m][r];
+      if (sid === undefined) return '';
+      return `${bySid[sid].name_kr}(${fmtPct(DATA.returns[sid][m])})`;
+    })];
+    lines.push(row.map(csvCell).join(','));
+  }
+  const csv = '﻿' + lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `us_sector_rank_${DATA.months[0]}_${DATA.months[DATA.months.length-1]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function init() {
+  selected = new Set(DATA.sectors.map(s => s.id));
+  document.getElementById('periodLabel').textContent =
+    `기간: ${DATA.months[0]} ~ ${DATA.months[DATA.months.length-1]} (${DATA.months.length}개월)`;
+  document.getElementById('sourceLabel').textContent = `출처: ${DATA.meta.source}`;
+  document.getElementById('asOfLabel').textContent = `기준일: ${DATA.meta.as_of}`;
+  const emptySectors = DATA.sectors.filter(s =>
+    DATA.months.every(m => DATA.returns[s.id][m] === null || DATA.returns[s.id][m] === undefined));
+  const banner = document.getElementById('sampleBanner');
+  if (emptySectors.length === DATA.sectors.length) {
+    banner.textContent = '⚠ 샘플(합성) 데이터입니다 — 실제 데이터 파이프라인 연동 전 자리표시자';
+    banner.style.display = 'inline-flex';
+  } else if (emptySectors.length > 0) {
+    banner.textContent = `⚠ ${DATA.sectors.length - emptySectors.length}/${DATA.sectors.length}개 세부업종만 실데이터 수집됨 — 미수집: ${emptySectors.map(s => s.name_kr).join(', ')} (ETF 티커 미설정)`;
+    banner.style.display = 'inline-flex';
+  }
+
+  buildFilterPanel();
+  renderSummary();
+  render();
+
+  document.getElementById('exportBtn').onclick = exportCsv;
+}
+
+loadData();
+
+// 최후의 안전장치: 무슨 이유로든 4초 안에 렌더링이 시작되지 않으면 강제로 폴백 데이터를 그린다.
+setTimeout(() => {
+  if (!DATA) {
+    DATA = FALLBACK_DATA;
+    init();
+  }
+}, 4000);
+</script>
+</body>
+</html>
